@@ -1,22 +1,19 @@
 package app
 
 import (
-	"flag"
-	"os"
-	"path/filepath"
 	"time"
 
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/carlosjgp/kubernetes-config-collector/handler"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/client-go/util/homedir"
 
-	log "github.com/sirupsen/logrus"
+	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
+
+	"k8s.io/client-go/tools/cache"
 	//
 	// Uncomment to load all auth plugins
 	// _ "k8s.io/client-go/plugin/pkg/client/auth"
@@ -40,68 +37,50 @@ type Config struct {
 }
 
 // Execute the app
-func Execute(config *Config) {
-	var kubeconfig *string
-	var clientconfig *rest.Config
-
-	// Check if we are running inside the cluster
-	// All the PODs have a service account and a mounted volume
-	// https://kubernetes.io/docs/reference/access-authn-authz/service-accounts-admin/#service-account-automation
-	_, err := os.Stat("/var/run/secrets/kubernetes.io/serviceaccount")
-	if os.IsNotExist(err) {
-		if home := homedir.HomeDir(); home != "" {
-			kubeconfig = flag.String("kubeconfig", filepath.Join(home, ".kube", "config"), "(optional) absolute path to the kubeconfig file")
-		} else {
-			kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
-		}
-		flag.Parse()
-
-		clientconfig, err = clientcmd.BuildConfigFromFlags("", *kubeconfig)
-	} else {
-		clientconfig, err = rest.InClusterConfig()
-	}
-
-	if err != nil {
-		panic(err)
-	}
-	clientset, err := kubernetes.NewForConfig(clientconfig)
-	if err != nil {
-		panic(err.Error())
-	}
-
+func Execute(clientset *kubernetes.Clientset, config *Config) {
 	cmClient := clientset.CoreV1().ConfigMaps("")
 
-	cmWatchList := &cache.ListWatch{
-		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-			return cmClient.List(metav1.ListOptions{})
-		},
-		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-			return cmClient.Watch(metav1.ListOptions{})
-		},
-	}
+	configmapController := NewConfigMapInformer(cmClient, metav1.ListOptions{}, handler.LogHandler)
 
-	// All namespaces
-	// watchlist := cache.NewListWatchFromClient(clientset.RESTClient(),
-	// 	"configmap", "", fields.Everything())
-	_, controller := cache.NewInformer(
-		cmWatchList,
-		&apiv1.ConfigMap{},
-		time.Second*0,
-		cache.ResourceEventHandlerFuncs{
-			AddFunc: func(obj interface{}) {
-				log.Infof("configmap added: %s", obj)
-			},
-			DeleteFunc: func(obj interface{}) {
-				log.Infof("configmap deleted: %s", obj)
-			},
-			UpdateFunc: func(oldObj, newObj interface{}) {
-				log.Infof("configmap changed")
-			},
-		},
-	)
 	stop := make(chan struct{})
-	go controller.Run(stop)
+	go configmapController.Run(stop)
 	for {
 		time.Sleep(time.Second)
 	}
+}
+
+func NewConfigMapInformer(
+	client corev1.ConfigMapInterface,
+	filteringOptions metav1.ListOptions,
+	handler cache.ResourceEventHandlerFuncs) cache.Controller {
+
+	return NewInformer(
+		func(options metav1.ListOptions) (runtime.Object, error) {
+			return client.List(filteringOptions)
+		},
+		func(options metav1.ListOptions) (watch.Interface, error) {
+			return client.Watch(filteringOptions)
+		},
+		&apiv1.ConfigMap{},
+		handler)
+}
+
+func NewInformer(
+	resourceListFunc cache.ListFunc,
+	resourceWatchFunc cache.WatchFunc,
+	resource runtime.Object,
+	handler cache.ResourceEventHandlerFuncs) cache.Controller {
+
+	controller := &cache.ListWatch{
+		ListFunc:  resourceListFunc,
+		WatchFunc: resourceWatchFunc,
+	}
+
+	_, informer := cache.NewInformer(
+		controller,
+		resource,
+		time.Second*0,
+		handler,
+	)
+	return informer
 }

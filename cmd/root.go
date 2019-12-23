@@ -3,7 +3,8 @@ package cmd
 import (
 	"os"
 
-	app "github.com/carlosjgp/kubernetes-config-collector/app"
+	"github.com/carlosjgp/kubernetes-config-collector/app"
+	"github.com/carlosjgp/kubernetes-config-collector/client"
 	"github.com/spf13/cobra"
 
 	log "github.com/sirupsen/logrus"
@@ -16,8 +17,13 @@ var (
 		Long: `conig-collector will collect each ConfigMap
 and will extract each data key as a file on the
 configured directory.`,
-		Run: func(cmd *cobra.Command, args []string) {
-			app.Execute(config)
+		RunE: func(cmd *cobra.Command, args []string) error {
+			clientset, err := client.GetClient()
+			if err != nil {
+				return err
+			}
+			app.Execute(clientset, config)
+			return nil
 		},
 	}
 	config = &app.Config{}

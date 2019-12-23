@@ -1,0 +1,20 @@
+language: go
+
+go:
+  - 1.13.x
+
+script:
+  - ./go-test.sh
+  - CGO_ENABLED=0 go build
+
+after_success:
+  - bash <(curl -s https://codecov.io/bash)
+
+deploy:
+  provider: releases
+  api_key: $GITHUB_OAUTH_TOKEN
+  file: "kubernetes-config-collector"
+  skip_cleanup: true
+  draft: true
+  on:
+    tags: true
