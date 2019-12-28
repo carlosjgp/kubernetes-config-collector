@@ -1,20 +1,46 @@
 language: go
 
+git:
+  quiet: true
+
+services: docker
+
 go:
   - 1.13.x
 
-script:
-  - ./go-test.sh
-  - CGO_ENABLED=0 go build
+addons:
+  apt:
+    update: true
+    packages:
+      - python3
 
-after_success:
-  - bash <(curl -s https://codecov.io/bash)
+# Setup jobs per platform
+jobs:
+  include:
+    - stage: test
+      script:
+        - ./go-test.sh
+      after_success:
+        - bash <(curl -s https://codecov.io/bash)
+    - stage: build
+      script:
+        - CGO_ENABLED=0 go build
+    - stage: deploy
+      script:
+        - curl -sL https://git.io/goreleaser | bash
+      deploy:
+      - provider: script
+        skip_cleanup: true
+        script: curl -sL https://git.io/goreleaser | bash
+        on:
+          tags: true
+          condition: $TRAVIS_OS_NAME = linux
 
-deploy:
-  provider: releases
-  api_key: $GITHUB_OAUTH_TOKEN
-  file: "kubernetes-config-collector"
-  skip_cleanup: true
-  draft: true
-  on:
-    tags: true
+      deploy:
+        provider: releases
+        api_key: $GITHUB_OAUTH_TOKEN
+        file: "kubernetes-config-collector"
+        skip_cleanup: true
+        draft: true
+        on:
+          tags: true

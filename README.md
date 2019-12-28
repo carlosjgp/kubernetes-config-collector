@@ -9,6 +9,8 @@ This is a project that aims to replicate [kiwigrid/k8s-sidecar](https://github.c
 
 ## Contributing
 
+Make sure your commits are signed
+
 ### CI server
 
 [Travis](https://travis-ci.org)

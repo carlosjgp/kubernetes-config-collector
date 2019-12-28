@@ -3,8 +3,8 @@ package cmd
 import (
 	"os"
 
-	"github.com/carlosjgp/kubernetes-config-collector/app"
-	"github.com/carlosjgp/kubernetes-config-collector/client"
+	"github.com/carlosjgp/kubernetes-config-collector/pkg/app"
+	"github.com/carlosjgp/kubernetes-config-collector/pkg/client"
 	"github.com/spf13/cobra"
 
 	log "github.com/sirupsen/logrus"
