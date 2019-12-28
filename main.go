@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/carlosjgp/kubernetes-config-collector/cmd"
+	"github.com/carlosjgp/kubernetes-config-collector/pkg/cmd"
 	log "github.com/sirupsen/logrus"
 )
 
