@@ -6,12 +6,40 @@ import (
 	"time"
 
 	"github.com/carlosjgp/kubernetes-config-collector/pkg/handler"
-	v1 "k8s.io/api/core/v1"
+	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/cache"
+)
+
+var (
+	ChannelHandler = func(events chan *handler.HandlerEvent) cache.ResourceEventHandlerFuncs {
+		return cache.ResourceEventHandlerFuncs{
+			AddFunc: func(obj interface{}) {
+				c := obj.(*apiv1.ConfigMap)
+				events <- &handler.HandlerEvent{
+					Object: c.GetObjectMeta(),
+					Action: "add",
+				}
+			},
+			DeleteFunc: func(obj interface{}) {
+				c := obj.(*apiv1.ConfigMap)
+				events <- &handler.HandlerEvent{
+					Object: c.GetObjectMeta(),
+					Action: "delete",
+				}
+			},
+			UpdateFunc: func(oldObj, newObj interface{}) {
+				c := newObj.(*metav1.ObjectMeta)
+				events <- &handler.HandlerEvent{
+					Object: c.GetObjectMeta(),
+					Action: "update",
+				}
+			},
+		}
+	}
 )
 
 // TestFakeClient
@@ -26,7 +54,7 @@ func TestAddWatchedConfigMap(t *testing.T) {
 
 	events := make(chan *handler.HandlerEvent, 1)
 
-	controller := NewConfigMapInformer(cmClient, metav1.ListOptions{}, handler.ChannelHandler(events, t))
+	controller := NewConfigMapInformer(cmClient, metav1.ListOptions{}, ChannelHandler(events))
 
 	informers := informers.NewSharedInformerFactory(client, 0)
 	informers.Start(ctx.Done())
@@ -40,7 +68,7 @@ func TestAddWatchedConfigMap(t *testing.T) {
 	cache.WaitForCacheSync(ctx.Done(), controller.HasSynced)
 
 	// Inject an event into the fake client.
-	cm := &v1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "my-cm"}}
+	cm := &apiv1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "my-cm"}}
 	t.Logf("Create new configmap: %s", cm)
 	_, err := cmClient.Create(cm)
 	if err != nil {

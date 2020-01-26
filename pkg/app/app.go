@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"time"
 
 	apiv1 "k8s.io/api/core/v1"
@@ -9,6 +10,7 @@ import (
 	"github.com/carlosjgp/kubernetes-config-collector/pkg/handler"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -38,12 +40,41 @@ type Config struct {
 
 // Execute the app
 func Execute(clientset *kubernetes.Clientset, config *Config) {
-	cmClient := clientset.CoreV1().ConfigMaps("")
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-	configmapController := NewConfigMapInformer(cmClient, metav1.ListOptions{}, handler.LogHandler)
+	// Add default namespace
+	var clients []corev1.ConfigMapInterface
+	if len(config.Namespaces) == 0 {
+		config.Namespaces = []string{""}
+	}
 
+	// Create a client per namespace
+	for _, ns := range config.Namespaces {
+		clients = append(clients, clientset.CoreV1().ConfigMaps(ns))
+	}
+
+	// Create a controller per client
+	var controllers []cache.Controller
+	for _, client := range clients {
+		controllers = append(controllers,
+			NewConfigMapInformer(client, metav1.ListOptions{}, handler.NewFileHandler(config.Folder)))
+	}
+
+	informers := informers.NewSharedInformerFactory(clientset, 0)
+	informers.Start(ctx.Done())
+
+	// Start all the controllers
 	stop := make(chan struct{})
-	go configmapController.Run(stop)
+	for _, ctrl := range controllers {
+		go ctrl.Run(stop)
+
+		// This is not required in tests, but it serves as a proof-of-concept by
+		// ensuring that the informer goroutine have warmed up and called List before
+		// we send any events to it.
+		cache.WaitForCacheSync(ctx.Done(), ctrl.HasSynced)
+	}
+
 	for {
 		time.Sleep(time.Second)
 	}
