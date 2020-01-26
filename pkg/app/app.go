@@ -2,12 +2,15 @@ package app
 
 import (
 	"context"
+	"strings"
 	"time"
 
+	log "github.com/sirupsen/logrus"
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/carlosjgp/kubernetes-config-collector/pkg/handler"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/informers"
@@ -34,31 +37,42 @@ type Config struct {
 	FolderAnnotation string
 	Folder           string
 	Namespaces       []string
-	ConfigMaps       bool
-	Secrets          bool
 }
 
 // Execute the app
 func Execute(clientset *kubernetes.Clientset, config *Config) {
+	if config.Verbose {
+		log.SetLevel(log.DebugLevel)
+	}
+	log.Infof("Executing...")
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	// Add default namespace
 	var clients []corev1.ConfigMapInterface
-	if len(config.Namespaces) == 0 {
-		config.Namespaces = []string{""}
-	}
-
 	// Create a client per namespace
 	for _, ns := range config.Namespaces {
+		log.Infof("Creating client for %s", ns)
 		clients = append(clients, clientset.CoreV1().ConfigMaps(ns))
 	}
+
+	// TODO improve label selector
+	// https://github.com/kubernetes/apimachinery/blob/v0.17.2/pkg/labels/selector.go#L803
 
 	// Create a controller per client
 	var controllers []cache.Controller
 	for _, client := range clients {
+		log.Infof("Creating controller")
 		controllers = append(controllers,
-			NewConfigMapInformer(client, metav1.ListOptions{}, handler.NewFileHandler(config.Folder)))
+			NewConfigMapInformer(
+				client,
+				metav1.ListOptions{
+					LabelSelector: strings.Join(config.Labels, ", "), // label exists
+				},
+				handler.NewFileHandler(handler.HandlerConfig{
+					FolderAnnotation: config.FolderAnnotation,
+					Folder:           config.Folder,
+				})))
 	}
 
 	informers := informers.NewSharedInformerFactory(clientset, 0)
@@ -67,6 +81,7 @@ func Execute(clientset *kubernetes.Clientset, config *Config) {
 	// Start all the controllers
 	stop := make(chan struct{})
 	for _, ctrl := range controllers {
+		log.Infof("Starting controller")
 		go ctrl.Run(stop)
 
 		// This is not required in tests, but it serves as a proof-of-concept by

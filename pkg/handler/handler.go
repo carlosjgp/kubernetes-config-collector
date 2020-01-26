@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"strings"
 
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -53,7 +54,7 @@ var (
 		Help: "The total number of files deleted",
 	})
 	keyAddedErrorCounter = promauto.NewCounter(prometheus.CounterOpts{
-		Name: "config_collector_key_add_total",
+		Name: "config_collector_key_add_error_total",
 		Help: "The total number of errors adding files",
 	})
 	keyUpdatedErrorCounter = promauto.NewCounter(prometheus.CounterOpts{
@@ -71,7 +72,33 @@ type HandlerEvent struct {
 	Action string
 }
 
-func NewFileHandler(folder string) cache.ResourceEventHandlerFuncs {
+// configuration
+type HandlerConfig struct {
+	FolderAnnotation string
+	Folder           string
+}
+
+func resolveFolder(config HandlerConfig, meta metav1.Object) string {
+	log.Debugf("Annotations: %s", meta.GetAnnotations())
+	var folder string
+	// Get folder annotation
+	if f, ok := meta.GetAnnotations()[config.FolderAnnotation]; ok {
+		// or default to config flag
+		log.Infof("Using custom folder: %s", f)
+		folder = f
+	} else {
+		log.Info("Folder annotation not found")
+		folder = config.Folder
+	}
+	return strings.TrimSuffix(folder, "/")
+}
+
+func resolveFilePath(config HandlerConfig, meta metav1.Object, file string) string {
+	return fmt.Sprintf("%s/%s", resolveFolder(config, meta), file)
+}
+
+// Create a new FileHandler
+func NewFileHandler(config HandlerConfig) cache.ResourceEventHandlerFuncs {
 	return cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			c := obj.(*apiv1.ConfigMap)
@@ -81,7 +108,7 @@ func NewFileHandler(folder string) cache.ResourceEventHandlerFuncs {
 
 			for key, element := range c.Data {
 				log.Infof("Processing key: %s/%s", name, key)
-				err := ioutil.WriteFile(fmt.Sprintf("%s/%s", folder, key), []byte(element), 0644)
+				err := ioutil.WriteFile(resolveFilePath(config, c.GetObjectMeta(), key), []byte(element), 0644)
 				keyAddedCounter.Inc()
 				if err != nil {
 					log.Fatal(err)
@@ -99,7 +126,7 @@ func NewFileHandler(folder string) cache.ResourceEventHandlerFuncs {
 			for key := range c.Data {
 				log.Infof("Processing key: %s/%s", name, key)
 				keyDeletedCounter.Inc()
-				err := os.Remove(fmt.Sprintf("%s/%s", folder, key))
+				err := os.Remove(resolveFilePath(config, c.GetObjectMeta(), key))
 				if err != nil {
 					log.Fatal(err)
 					keyDeletedErrorCounter.Inc()
@@ -122,7 +149,7 @@ func NewFileHandler(folder string) cache.ResourceEventHandlerFuncs {
 					log.Infof("Deleting: %s/%s", name, key)
 					keyDeletedCounter.Inc()
 
-					err := os.Remove(fmt.Sprintf("%s/%s", folder, key))
+					err := os.Remove(resolveFilePath(config, cmOld.GetObjectMeta(), key))
 					if err != nil {
 						log.Fatal(err)
 						keyDeletedErrorCounter.Inc()
@@ -135,7 +162,7 @@ func NewFileHandler(folder string) cache.ResourceEventHandlerFuncs {
 				log.Infof("Adding/Updating: %s/%s", name, key)
 				keyAddedCounter.Inc()
 
-				err := ioutil.WriteFile(fmt.Sprintf("%s/%s", folder, key), []byte(element), 0644)
+				err := ioutil.WriteFile(resolveFilePath(config, cmOld.GetObjectMeta(), key), []byte(element), 0644)
 				if err != nil {
 					log.Fatal(err)
 					keyAddedErrorCounter.Inc()

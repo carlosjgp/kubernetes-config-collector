@@ -1,17 +1,24 @@
 package cmd
 
 import (
+	"bytes"
 	"fmt"
+	"html/template"
+	"runtime"
+	"strings"
 
 	"github.com/spf13/cobra"
 )
 
 // nolint: gochecknoglobals
+// Build information. Populated at build-time.
 var (
-	version = "dev"
-	commit  = ""
-	date    = ""
-	builtBy = ""
+	Version   string
+	Revision  string
+	Branch    string
+	BuildUser string
+	BuildDate string
+	GoVersion = runtime.Version()
 )
 
 func init() {
@@ -23,20 +30,48 @@ var versionCmd = &cobra.Command{
 	Short: "Print the version number of config-collector",
 	Long:  `All software has versions. This is config-collector's`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Print(buildVersion())
+		fmt.Print(BuildVersion())
 	},
 }
 
-func buildVersion() string {
-	var result = fmt.Sprintf("version: %s", version)
-	if commit != "" {
-		result = fmt.Sprintf("%s\ncommit: %s", result, commit)
+// Print returns version information.
+func BuildVersion() string {
+	return print("kubernetes-config-collector")
+}
+
+// versionInfoTmpl contains the template used by Info.
+var versionInfoTmpl = `
+{{.program}}, version {{.version}} (branch: {{.branch}}, revision: {{.revision}})
+  build user:       {{.buildUser}}
+  build date:       {{.buildDate}}
+  go version:       {{.goVersion}}
+`
+
+func print(program string) string {
+	m := map[string]string{
+		"program":   program,
+		"version":   Version,
+		"revision":  Revision,
+		"branch":    Branch,
+		"buildUser": BuildUser,
+		"buildDate": BuildDate,
+		"goVersion": GoVersion,
 	}
-	if date != "" {
-		result = fmt.Sprintf("%s\nbuilt at: %s", result, date)
+	t := template.Must(template.New("version").Parse(versionInfoTmpl))
+
+	var buf bytes.Buffer
+	if err := t.ExecuteTemplate(&buf, "version", m); err != nil {
+		panic(err)
 	}
-	if builtBy != "" {
-		result = fmt.Sprintf("%s\nbuilt by: %s", result, builtBy)
-	}
-	return result
+	return strings.TrimSpace(buf.String())
+}
+
+// Info returns version, branch and revision information.
+func Info() string {
+	return fmt.Sprintf("(version=%s, branch=%s, revision=%s)", Version, Branch, Revision)
+}
+
+// BuildContext returns goVersion, buildUser and buildDate information.
+func BuildContext() string {
+	return fmt.Sprintf("(go=%s, user=%s, date=%s)", GoVersion, BuildUser, BuildDate)
 }

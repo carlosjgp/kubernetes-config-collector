@@ -7,10 +7,11 @@ before:
 builds:
 - ldflags:
     - -s -w
-    - -X 'github.com/carlosjgp/kubernetes-config-collector/pkg/cmd.version={{.Version}}'
-    - -X 'github.com/carlosjgp/kubernetes-config-collector/pkg/cmd.commit={{.Commit}}'
-    - -X 'github.com/carlosjgp/kubernetes-config-collector/pkg/cmd.date={{.Date}}'
-    - -X 'github.com/carlosjgp/kubernetes-config-collector/pkg/cmd.builtBy=Carlos Juan Gómez Peñalver'
+    - -X 'github.com/carlosjgp/kubernetes-config-collector/pkg/cmd.Version={{.Version}}'
+    - -X 'github.com/carlosjgp/kubernetes-config-collector/pkg/cmd.Branch=master'
+    - -X 'github.com/carlosjgp/kubernetes-config-collector/pkg/cmd.Revision={{.Commit}}'
+    - -X 'github.com/carlosjgp/kubernetes-config-collector/pkg/cmd.BuildDate={{.Date}}'
+    - -X 'github.com/carlosjgp/kubernetes-config-collector/pkg/cmd.BuildUser=Carlos Juan Gómez Peñalver'
   env:
     - CGO_ENABLED=0
   goos:
