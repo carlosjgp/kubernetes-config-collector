@@ -78,7 +78,7 @@ type HandlerConfig struct {
 	Folder           string
 }
 
-func resolveFolder(config HandlerConfig, meta metav1.Object) string {
+func ResolveFolder(config HandlerConfig, meta metav1.Object) string {
 	log.Debugf("Annotations: %s", meta.GetAnnotations())
 	var folder string
 	// Get folder annotation
@@ -93,8 +93,8 @@ func resolveFolder(config HandlerConfig, meta metav1.Object) string {
 	return strings.TrimSuffix(folder, "/")
 }
 
-func resolveFilePath(config HandlerConfig, meta metav1.Object, file string) string {
-	return fmt.Sprintf("%s/%s", resolveFolder(config, meta), file)
+func ResolveFilePath(config HandlerConfig, meta metav1.Object, file string) string {
+	return fmt.Sprintf("%s/%s", ResolveFolder(config, meta), file)
 }
 
 // Create a new FileHandler
@@ -108,7 +108,7 @@ func NewFileHandler(config HandlerConfig) cache.ResourceEventHandlerFuncs {
 
 			for key, element := range c.Data {
 				log.Infof("Processing key: %s/%s", name, key)
-				err := ioutil.WriteFile(resolveFilePath(config, c.GetObjectMeta(), key), []byte(element), 0644)
+				err := ioutil.WriteFile(ResolveFilePath(config, c.GetObjectMeta(), key), []byte(element), 0644)
 				keyAddedCounter.Inc()
 				if err != nil {
 					log.Fatal(err)
@@ -126,7 +126,7 @@ func NewFileHandler(config HandlerConfig) cache.ResourceEventHandlerFuncs {
 			for key := range c.Data {
 				log.Infof("Processing key: %s/%s", name, key)
 				keyDeletedCounter.Inc()
-				err := os.Remove(resolveFilePath(config, c.GetObjectMeta(), key))
+				err := os.Remove(ResolveFilePath(config, c.GetObjectMeta(), key))
 				if err != nil {
 					log.Fatal(err)
 					keyDeletedErrorCounter.Inc()
@@ -149,7 +149,7 @@ func NewFileHandler(config HandlerConfig) cache.ResourceEventHandlerFuncs {
 					log.Infof("Deleting: %s/%s", name, key)
 					keyDeletedCounter.Inc()
 
-					err := os.Remove(resolveFilePath(config, cmOld.GetObjectMeta(), key))
+					err := os.Remove(ResolveFilePath(config, cmOld.GetObjectMeta(), key))
 					if err != nil {
 						log.Fatal(err)
 						keyDeletedErrorCounter.Inc()
@@ -162,7 +162,7 @@ func NewFileHandler(config HandlerConfig) cache.ResourceEventHandlerFuncs {
 				log.Infof("Adding/Updating: %s/%s", name, key)
 				keyAddedCounter.Inc()
 
-				err := ioutil.WriteFile(resolveFilePath(config, cmOld.GetObjectMeta(), key), []byte(element), 0644)
+				err := ioutil.WriteFile(ResolveFilePath(config, cmOld.GetObjectMeta(), key), []byte(element), 0644)
 				if err != nil {
 					log.Fatal(err)
 					keyAddedErrorCounter.Inc()
