@@ -15,25 +15,25 @@ import (
 )
 
 var (
-	ChannelHandler = func(events chan *handler.HandlerEvent) cache.ResourceEventHandlerFuncs {
+	ChannelHandler = func(events chan *handler.Event) cache.ResourceEventHandlerFuncs {
 		return cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				c := obj.(*apiv1.ConfigMap)
-				events <- &handler.HandlerEvent{
+				events <- &handler.Event{
 					Object: c.GetObjectMeta(),
 					Action: "add",
 				}
 			},
 			DeleteFunc: func(obj interface{}) {
 				c := obj.(*apiv1.ConfigMap)
-				events <- &handler.HandlerEvent{
+				events <- &handler.Event{
 					Object: c.GetObjectMeta(),
 					Action: "delete",
 				}
 			},
 			UpdateFunc: func(oldObj, newObj interface{}) {
 				c := newObj.(*metav1.ObjectMeta)
-				events <- &handler.HandlerEvent{
+				events <- &handler.Event{
 					Object: c.GetObjectMeta(),
 					Action: "update",
 				}
@@ -52,7 +52,7 @@ func TestAddWatchedConfigMap(t *testing.T) {
 
 	cmClient := client.CoreV1().ConfigMaps("")
 
-	events := make(chan *handler.HandlerEvent, 1)
+	events := make(chan *handler.Event, 1)
 
 	controller := NewConfigMapInformer(cmClient, metav1.ListOptions{}, ChannelHandler(events))
 

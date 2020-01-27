@@ -21,7 +21,7 @@ func TestResolveFolderWithoutAnnotation(t *testing.T) {
 		},
 	}
 
-	folder := ResolveFolder(HandlerConfig{
+	folder := ResolveFolder(Config{
 		FolderAnnotation: "config-collector.io/folder",
 		Folder:           expectedFolder,
 	}, o)
@@ -40,7 +40,7 @@ func TestResolveFolderWithAnnotation(t *testing.T) {
 		},
 	}
 
-	folder := ResolveFolder(HandlerConfig{
+	folder := ResolveFolder(Config{
 		FolderAnnotation: annotation,
 		Folder:           "/tmp",
 	}, o)
@@ -58,7 +58,7 @@ func TestResolveFolderRemoveTrailingSlash(t *testing.T) {
 		},
 	}
 
-	folder := ResolveFolder(HandlerConfig{
+	folder := ResolveFolder(Config{
 		FolderAnnotation: "config-collector.io/folder",
 		Folder:           expectedFolder + "/",
 	}, o)
@@ -72,12 +72,43 @@ func TestResolveFilePath(t *testing.T) {
 	var o metav1.Object
 	o = &metav1.ObjectMeta{}
 
-	path := ResolveFilePath(HandlerConfig{
+	path := ResolveFilePath(Config{
 		FolderAnnotation: "config-collector.io/folder",
 		Folder:           "/tmp",
 	}, o, "test")
 
 	assert.Equal(t, path, expectedPath)
+}
+
+func TestNewFileResolverAddError(t *testing.T) {
+
+	tmpDir, err := ioutil.TempDir("/tmp", "test")
+	if err != nil {
+		panic(err)
+	}
+
+	os.Chmod(tmpDir, 0444)
+	config := Config{
+		Folder: tmpDir,
+	}
+
+	handler := NewFileHandler(config)
+
+	cm := &apiv1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "my-cm",
+		},
+		Data: map[string]string{
+			"test": ":)",
+		},
+	}
+
+	filename := ResolveFilePath(config, cm.GetObjectMeta(), "test")
+
+	// Create file and check it exists
+	handler.AddFunc(cm)
+	_, err = os.Stat(filename)
+	assert.Assert(t, err != nil)
 }
 
 func TestNewFileResolverAdd(t *testing.T) {
@@ -86,7 +117,7 @@ func TestNewFileResolverAdd(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	config := HandlerConfig{
+	config := Config{
 		Folder: tmpDir,
 	}
 
@@ -109,13 +140,46 @@ func TestNewFileResolverAdd(t *testing.T) {
 	assert.Assert(t, err == nil)
 }
 
+func TestNewFileResolverDeleteError(t *testing.T) {
+
+	tmpDir, err := ioutil.TempDir("/tmp", "test")
+	if err != nil {
+		panic(err)
+	}
+	config := Config{
+		Folder: tmpDir,
+	}
+
+	handler := NewFileHandler(config)
+
+	cm := &apiv1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "my-cm",
+		},
+		Data: map[string]string{
+			"test": ":)",
+		},
+	}
+
+	filename := ResolveFilePath(config, cm.GetObjectMeta(), "test")
+	ioutil.WriteFile(filename, []byte("test"), 0400)
+	// Change owner to root
+	os.Chown(filename, 0, 0)
+	// Delete file and check is gone
+	handler.DeleteFunc(cm)
+	_, err = os.Stat(filename)
+
+	// TODO this should be ""== nil"
+	assert.Assert(t, err != nil)
+}
+
 func TestNewFileResolverDelete(t *testing.T) {
 
 	tmpDir, err := ioutil.TempDir("/tmp", "test")
 	if err != nil {
 		panic(err)
 	}
-	config := HandlerConfig{
+	config := Config{
 		Folder: tmpDir,
 	}
 
@@ -144,7 +208,7 @@ func TestNewFileResolver(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	config := HandlerConfig{
+	config := Config{
 		Folder: tmpDir,
 	}
 

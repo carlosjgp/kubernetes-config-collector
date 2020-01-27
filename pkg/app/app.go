@@ -30,7 +30,10 @@ import (
 	// _ "k8s.io/client-go/plugin/pkg/client/auth/openstack"
 )
 
-// Application configuration
+/**
+Config
+Application configuration
+*/
 type Config struct {
 	Verbose          bool
 	Labels           []string
@@ -69,7 +72,7 @@ func Execute(clientset *kubernetes.Clientset, config *Config) {
 				metav1.ListOptions{
 					LabelSelector: strings.Join(config.Labels, ", "), // label exists
 				},
-				handler.NewFileHandler(handler.HandlerConfig{
+				handler.NewFileHandler(handler.Config{
 					FolderAnnotation: config.FolderAnnotation,
 					Folder:           config.Folder,
 				})))
@@ -95,6 +98,8 @@ func Execute(clientset *kubernetes.Clientset, config *Config) {
 	}
 }
 
+/**
+ */
 func NewConfigMapInformer(
 	client corev1.ConfigMapInterface,
 	filteringOptions metav1.ListOptions,

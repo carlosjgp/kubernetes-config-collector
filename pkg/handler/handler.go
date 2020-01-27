@@ -17,18 +17,6 @@ import (
 )
 
 var (
-	LogHandler = cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
-			log.Infof("configmap added: %s", obj)
-		},
-		DeleteFunc: func(obj interface{}) {
-			log.Infof("configmap deleted: %s", obj)
-		},
-		UpdateFunc: func(oldObj interface{}, newObj interface{}) {
-			log.Infof("configmap changed: %s", oldObj)
-		},
-	}
-
 	configMapAddedCounter = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "config_collector_cm_add_total",
 		Help: "The total number of ConfigMaps added",
@@ -67,18 +55,21 @@ var (
 	})
 )
 
-type HandlerEvent struct {
+/**
+Events managed by the handler
+*/
+type Event struct {
 	metav1.Object
 	Action string
 }
 
 // configuration
-type HandlerConfig struct {
+type Config struct {
 	FolderAnnotation string
 	Folder           string
 }
 
-func ResolveFolder(config HandlerConfig, meta metav1.Object) string {
+func ResolveFolder(config Config, meta metav1.Object) string {
 	log.Debugf("Annotations: %s", meta.GetAnnotations())
 	var folder string
 	// Get folder annotation
@@ -93,12 +84,12 @@ func ResolveFolder(config HandlerConfig, meta metav1.Object) string {
 	return strings.TrimSuffix(folder, "/")
 }
 
-func ResolveFilePath(config HandlerConfig, meta metav1.Object, file string) string {
+func ResolveFilePath(config Config, meta metav1.Object, file string) string {
 	return fmt.Sprintf("%s/%s", ResolveFolder(config, meta), file)
 }
 
 // Create a new FileHandler
-func NewFileHandler(config HandlerConfig) cache.ResourceEventHandlerFuncs {
+func NewFileHandler(config Config) cache.ResourceEventHandlerFuncs {
 	return cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			c := obj.(*apiv1.ConfigMap)
@@ -109,9 +100,10 @@ func NewFileHandler(config HandlerConfig) cache.ResourceEventHandlerFuncs {
 			for key, element := range c.Data {
 				log.Infof("Processing key: %s/%s", name, key)
 				err := ioutil.WriteFile(ResolveFilePath(config, c.GetObjectMeta(), key), []byte(element), 0644)
-				keyAddedCounter.Inc()
-				if err != nil {
-					log.Fatal(err)
+				if err == nil {
+					keyAddedCounter.Inc()
+				} else {
+					log.Error(err)
 					keyAddedErrorCounter.Inc()
 				}
 			}
@@ -125,10 +117,11 @@ func NewFileHandler(config HandlerConfig) cache.ResourceEventHandlerFuncs {
 
 			for key := range c.Data {
 				log.Infof("Processing key: %s/%s", name, key)
-				keyDeletedCounter.Inc()
 				err := os.Remove(ResolveFilePath(config, c.GetObjectMeta(), key))
-				if err != nil {
-					log.Fatal(err)
+				if err == nil {
+					keyDeletedCounter.Inc()
+				} else {
+					log.Error(err)
 					keyDeletedErrorCounter.Inc()
 				}
 			}
@@ -147,11 +140,12 @@ func NewFileHandler(config HandlerConfig) cache.ResourceEventHandlerFuncs {
 				log.Infof("Processing key: %s/%s", name, key)
 				if _, ok := cmNew.Data[key]; ok {
 					log.Infof("Deleting: %s/%s", name, key)
-					keyDeletedCounter.Inc()
 
 					err := os.Remove(ResolveFilePath(config, cmOld.GetObjectMeta(), key))
-					if err != nil {
-						log.Fatal(err)
+					if err == nil {
+						keyDeletedCounter.Inc()
+					} else {
+						log.Error(err)
 						keyDeletedErrorCounter.Inc()
 					}
 				}
@@ -160,11 +154,12 @@ func NewFileHandler(config HandlerConfig) cache.ResourceEventHandlerFuncs {
 			for key, element := range cmNew.Data {
 				log.Infof("Processing key: %s/%s", name, key)
 				log.Infof("Adding/Updating: %s/%s", name, key)
-				keyAddedCounter.Inc()
 
 				err := ioutil.WriteFile(ResolveFilePath(config, cmOld.GetObjectMeta(), key), []byte(element), 0644)
-				if err != nil {
-					log.Fatal(err)
+				if err == nil {
+					keyAddedCounter.Inc()
+				} else {
+					log.Error(err)
 					keyAddedErrorCounter.Inc()
 				}
 			}
