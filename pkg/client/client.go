@@ -1,7 +1,6 @@
 package client
 
 import (
-	"flag"
 	"os"
 	"path/filepath"
 
@@ -21,7 +20,6 @@ import (
 )
 
 func GetClient() (*kubernetes.Clientset, error) {
-	var kubeconfig *string
 	var clientconfig *rest.Config
 
 	// Check if we are running inside the cluster
@@ -29,14 +27,12 @@ func GetClient() (*kubernetes.Clientset, error) {
 	// https://kubernetes.io/docs/reference/access-authn-authz/service-accounts-admin/#service-account-automation
 	_, err := os.Stat("/var/run/secrets/kubernetes.io/serviceaccount")
 	if os.IsNotExist(err) {
+		kubeconfig := ""
 		if home := homedir.HomeDir(); home != "" {
-			kubeconfig = flag.String("kubeconfig", filepath.Join(home, ".kube", "config"), "(optional) absolute path to the kubeconfig file")
-		} else {
-			kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
+			kubeconfig = filepath.Join(home, ".kube", "config")
 		}
-		flag.Parse()
 
-		clientconfig, err = clientcmd.BuildConfigFromFlags("", *kubeconfig)
+		clientconfig, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
 	} else {
 		clientconfig, err = rest.InClusterConfig()
 	}
