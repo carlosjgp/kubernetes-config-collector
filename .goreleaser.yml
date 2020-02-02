@@ -8,7 +8,7 @@ builds:
 - ldflags:
     - -s -w
     - -X 'github.com/carlosjgp/kubernetes-config-collector/pkg/cmd.Version={{.Version}}'
-    - -X 'github.com/carlosjgp/kubernetes-config-collector/pkg/cmd.Branch=master'
+    - -X 'github.com/carlosjgp/kubernetes-config-collector/pkg/cmd.Tag={{.Tag}}'
     - -X 'github.com/carlosjgp/kubernetes-config-collector/pkg/cmd.Revision={{.Commit}}'
     - -X 'github.com/carlosjgp/kubernetes-config-collector/pkg/cmd.BuildDate={{.Date}}'
     - -X 'github.com/carlosjgp/kubernetes-config-collector/pkg/cmd.BuildUser=Carlos Juan Gómez Peñalver'
@@ -67,7 +67,7 @@ dockers:
     # If set to auto, the release will not be pushed to the docker repository
     # in case there is an indicator for prerelease in the tag e.g. v1.0.0-rc1
     # Defaults to false.
-    skip_push: auto
+    skip_push: false
 
     # Path to the Dockerfile (from the project root).
     dockerfile: Dockerfile
