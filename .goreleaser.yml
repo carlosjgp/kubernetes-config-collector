@@ -8,7 +8,7 @@ builds:
 - ldflags:
     - -s -w
     - -X 'github.com/carlosjgp/kubernetes-config-collector/pkg/cmd.Version={{.Version}}'
-    - -X 'github.com/carlosjgp/kubernetes-config-collector/pkg/cmd.Branch=master'
+    - -X 'github.com/carlosjgp/kubernetes-config-collector/pkg/cmd.Tag={{.Tag}}'
     - -X 'github.com/carlosjgp/kubernetes-config-collector/pkg/cmd.Revision={{.Commit}}'
     - -X 'github.com/carlosjgp/kubernetes-config-collector/pkg/cmd.BuildDate={{.Date}}'
     - -X 'github.com/carlosjgp/kubernetes-config-collector/pkg/cmd.BuildUser=Carlos Juan Gómez Peñalver'
@@ -47,6 +47,38 @@ archives:
       format: zip
 snapshot:
   name_template: "{{ .Tag }}-next"
+
+dockers:
+  -
+    goos: linux
+    goarch: amd64
+    goarm: ''
+    binaries:
+    - kubernetes-config-collector
+
+    # Templates of the Docker image names.
+    image_templates:
+    - "carlosjgp/{{.ProjectName}}:latest"
+    - "carlosjgp/{{.ProjectName}}:{{ .Tag }}"
+    - "carlosjgp/{{.ProjectName}}:v{{ .Major }}"
+    - "carlosjgp/{{.ProjectName}}:v{{ .Major }}.{{ .Minor }}"
+
+    # Skips the docker push. Could be useful if you also do draft releases.
+    # If set to auto, the release will not be pushed to the docker repository
+    # in case there is an indicator for prerelease in the tag e.g. v1.0.0-rc1
+    # Defaults to false.
+    skip_push: false
+
+    # Path to the Dockerfile (from the project root).
+    dockerfile: Dockerfile
+
+    # Template of the docker build flags.
+    build_flag_templates:
+    - "--pull"
+    - "--label=org.opencontainers.image.created={{.Date}}"
+    - "--label=org.opencontainers.image.name={{.ProjectName}}"
+    - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+    - "--label=org.opencontainers.image.version={{.Version}}"
 
 release:
   draft: true

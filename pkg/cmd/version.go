@@ -15,7 +15,7 @@ import (
 var (
 	Version   string
 	Revision  string
-	Branch    string
+	Tag       string
 	BuildUser string
 	BuildDate string
 	GoVersion = runtime.Version()
@@ -52,7 +52,7 @@ func print(program string) string {
 		"program":   program,
 		"version":   Version,
 		"revision":  Revision,
-		"branch":    Branch,
+		"tag":       Tag,
 		"buildUser": BuildUser,
 		"buildDate": BuildDate,
 		"goVersion": GoVersion,
@@ -68,7 +68,7 @@ func print(program string) string {
 
 // Info returns version, branch and revision information.
 func Info() string {
-	return fmt.Sprintf("(version=%s, branch=%s, revision=%s)", Version, Branch, Revision)
+	return fmt.Sprintf("(version=%s, tag=%s, revision=%s)", Version, Tag, Revision)
 }
 
 // BuildContext returns goVersion, buildUser and buildDate information.
